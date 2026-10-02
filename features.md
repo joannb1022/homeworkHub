@@ -6,21 +6,22 @@ A small app where a teacher keeps a list of their students, gives homework (PDF)
 
 ## 2. Scope
 
-**In scope (v1):** teacher and student accounts, student profiles (name, age, lesson times), assignments with PDF, assigning work to students, a panel per student, submissions (latest only), manual grading, feedback.
+**In scope (v1):** teacher and student accounts, student profiles (name, school class), assignments with PDF, assigning work to students with a deadline, a panel per student, submissions (latest only), manual grading, feedback.
 
 **Later (not in v1):**
 - Assignment library for the teacher (list of all assignments with per-student status, edit, take back, duplicate)
-- Groups: "assign to a group" would just create one assigned work per member
+- Groups: "assign to a group" would just create one assignment work per member
+- "Promote everyone to the next school class" button
 - AI grading via the `SubmissionChecker` interface
 - Cloud storage via the `FileStorage` interface
-- Lesson calendar features (reschedule, cancel, attendance), notifications, frontend, multiple teachers
+- Plan and list lesson dates, notifications, frontend, multiple teachers
 
 ## 3. Actors
 
-| Actor | Can do |
-|-------|--------|
+| Actor | Can do                                                                                                                                                                               |
+|-------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | TEACHER | Add and edit students, see the student list, open any student's panel, create assignments, give them to students, see submissions, grade, give feedback, extend a student's deadline |
-| STUDENT | Open own panel, download assignment PDFs, upload and resubmit own solutions, see own grades and feedback, see own profile |
+| STUDENT | Open own panel, download assignment PDFs, upload and resubmit own solutions, see own grades and feedback                                                                             |
 
 ## 4. Features
 
@@ -28,11 +29,11 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done
 
 - [ ] Log in (session-based first, JWT later)
 - [ ] Teacher adds a student (creates the account and profile)
-- [ ] Teacher edits a student's profile and lesson times
-- [ ] Teacher sees the student list: name, age, lesson times, short summary (paginated)
+- [ ] Teacher edits a student's profile (name, school class)
+- [ ] Teacher sees the student list: name, school class
 - [ ] Teacher clicks a student to open that student's panel
-- [ ] Teacher creates an assignment (title, description, default deadline, PDF)
-- [ ] Teacher gives an assignment to a student (from the student's panel), or to several students
+- [ ] Teacher creates an assignment (title, description, PDF)
+- [ ] Teacher gives an assignment to one or more students with a deadline (from the student's panel, or by picking students)
 - [ ] Teacher changes the deadline for one student (extension)
 - [ ] Student panel: own assigned work with status and deadline (paginated)
 - [ ] Student downloads assignment PDF
@@ -49,31 +50,29 @@ Each rule should have at least one test.
 
 ### Student profile
 - First name and last name must not be blank (both roles have them)
-- Date of birth is stored; age is calculated from it and the current date (never stored), and the date cannot be in the future
-- A student has zero or more weekly lesson slots: day of week, start time, duration in minutes
-- Duration must be positive; a student's own lesson slots must not overlap
-- Lesson times are local to the teacher's time zone (configured once)
+- School class is optional text (for example `7A`); the teacher updates it by hand
 - Personal data is minimal and visible only to the teacher and the student themselves
 - A student sees only the teacher's name, never the teacher's email or any other student's data
 
 ### Assignment
 - Title must not be blank
-- Default deadline must not be null
 - Attachment must be a PDF, max size configurable
+- An assignment has no deadline of its own; the deadline is set when it is given to students
 
-### Assigned work
+### Assignment work
 - An assignment can be given to one or more students; a student gets it at most once
-- The deadline starts as the assignment's deadline and can be overridden per student
-- Assigned work is open until its deadline (`isOpenAt(now)`)
-- Status is derived from the submission and the deadline (not submitted, submitted, late, graded), not stored separately
+- A deadline is required and must be in the future when the work is given
+- Assignment work is open until its deadline (`isOpenAt(now)`)
+- The teacher can move the deadline for one student
+- Status is derived (not submitted, submitted, late, graded), not stored
 
 ### Submission
-- Submitted on time -> status `SUBMITTED`
-- Submitted after the deadline -> status `LATE` *(decision pending: accept late work or reject it?)*
+- Submitted on time -> not late
+- Submitted after the deadline -> late *(decision pending: accept late work or reject it?)*
 - Resubmission before the deadline replaces the previous submission; only the latest one is kept, there is no version history
+- On resubmission the whole file set is replaced, the old files are deleted from storage, and `submittedAt` is updated
 - Resubmission after the deadline is rejected (`DeadlinePassedException`)
-- A `GRADED` submission cannot be changed
-- On resubmission the whole file set is replaced, the old files are deleted from storage, and `submittedAt` is updated to the new time
+- A graded submission cannot be changed
 - Student id and timestamp come from the server (auth + `Clock`), never from the request
 
 ### Files
@@ -94,42 +93,91 @@ Each rule should have at least one test.
 - A student can only open their own panel and profile and read their own submissions
 - A teacher can open any student's profile and panel and read all submissions
 - Access to another student's data returns 404 (not 403)
+- A student sees only the teacher's name, never the teacher's email or any other student's data
 - The list of allowed actions in the panel is a convenience for the UI; every action endpoint checks permissions again
 - There is no public sign-up: the teacher creates student accounts
 - Passwords are stored with BCrypt
 
-## 6. Domain model (v1)
+## 6. Domain model and database scheme
+
+### Tables
 
 ```
-User            id, email, passwordHash, role (TEACHER | STUDENT),
-                firstName, lastName
-StudentProfile  userId, dateOfBirth, lessonSlots (0..n)
-LessonSlot      dayOfWeek, startTime, durationMinutes        [value object]
-Assignment      id, title, description, defaultDeadline, pdfFileKey, createdBy
-AssignedWork    id, assignment, student, deadline, assignedAt
-Submission      id, assignedWork, submittedAt, status,
-                grade (optional), files (1..10)
-SubmissionFile  id, storageKey, originalFilename, fileType (PDF | JPEG | PNG),
-                sizeBytes, position
-Grade           value (0-100), feedback, gradedAt            [value object]
+users
+  id                  bigint        PK, generated
+  email               varchar(255)  NOT NULL, UNIQUE
+  password_hash       varchar(255)  NOT NULL
+  first_name          varchar(100)  NOT NULL
+  last_name           varchar(100)  NOT NULL
+  role                varchar(20)   NOT NULL, CHECK in ('TEACHER','STUDENT')
+  created_at          timestamptz   NOT NULL
+  updated_at          timestamptz   NOT NULL
+
+student_profile                                   -- only for users with role STUDENT
+  user_id             bigint        PK and FK -> users(id) ON DELETE CASCADE
+  school_class        varchar(20)   NULL
+
+assignment
+  id                  bigint        PK, generated
+  title               varchar(200)  NOT NULL
+  description         text          NULL
+  pdf_file_key        varchar(255)  NOT NULL
+  created_at          timestamptz   NOT NULL
+  created_by          bigint        NOT NULL, FK -> users(id) ON DELETE RESTRICT
+
+assignment_work
+  id                  bigint        PK, generated
+  assignment_id       bigint        NOT NULL, FK -> assignment(id) ON DELETE RESTRICT
+  student_id          bigint        NOT NULL, FK -> student_profile(user_id) ON DELETE CASCADE
+  deadline            timestamptz   NOT NULL
+  assigned_at         timestamptz   NOT NULL
+  UNIQUE (assignment_id, student_id)
+  INDEX (student_id)
+
+submission
+  id                  bigint        PK, generated
+  assignment_work_id  bigint        NOT NULL, UNIQUE, FK -> assignment_work(id) ON DELETE CASCADE
+  submitted_at        timestamptz   NOT NULL
+  is_late             boolean       NOT NULL
+  grade_value         smallint      NULL, CHECK (0 to 100)
+  grade_feedback      text          NULL
+  graded_at           timestamptz   NULL
+  CHECK ((grade_value IS NULL) = (graded_at IS NULL))
+
+submission_file
+  id                  bigint        PK, generated
+  submission_id       bigint        NOT NULL, FK -> submission(id) ON DELETE CASCADE
+  storage_key         varchar(255)  NOT NULL, UNIQUE
+  original_filename   varchar(255)  NOT NULL
+  file_type           varchar(10)   NOT NULL, CHECK in ('PDF','JPEG','PNG')
+  size_bytes          bigint        NOT NULL
+  position            smallint      NOT NULL
+  UNIQUE (submission_id, position)
 ```
 
+### Relationships (cardinality)
 
-Statuses: `SUBMITTED -> GRADED`, `LATE -> GRADED`
+| Relationship | Reads as |
+|---|---|
+| users - student_profile | A student user has exactly one profile; a teacher has none (1 to 0..1) |
+| users - assignment (created_by) | A teacher has zero or many assignments; each has exactly one creator |
+| assignment - assignment_work | An assignment has zero or many assignment works (zero = not given yet); each belongs to exactly one assignment |
+| student_profile - assignment_work | A student has zero or many assignment works; each belongs to exactly one student |
+| assignment_work - submission | An assignment work has zero or one submission; a submission belongs to exactly one assignment work |
+| submission - submission_file | A submission has 1 to 10 files; each file belongs to exactly one submission |
 
-The assignment is the template (written once). Assigned work is one copy per student, so a deadline extension or a missing submission is tracked per student.
 
 ## 7. Panel view
 
 Same view, different capabilities.
 
 **Teacher: student list** (`/api/students`)
-- Paginated list: first name, last name, age, lesson times
-- Short summary per student: open assignments, waiting to be graded, overdue
+- Paginated list: first name, last name, school class
+- Per student: short summary (open assignments, waiting to be graded, overdue)
 - Click a student to open their panel
 
 **Teacher: a student's panel** (`/api/students/{studentId}/panel`)
-- Header: the teacher's own name, then the student's profile (name, age, lesson times)
+- Header: the teacher's own name, then the student's profile (name, school class)
 - The student's assigned work with status, deadline and grade; paginated, with a status filter
 - Teacher actions: give a new assignment, `VIEW_SUBMISSION`, `DOWNLOAD_SUBMISSION`, `GRADE`, `EXTEND_DEADLINE`
 
@@ -138,22 +186,15 @@ Same view, different capabilities.
 - Own assigned work with status, deadline and grade; each item shows who gave it ("Given by ...")
 - Actions: `DOWNLOAD_ASSIGNMENT`, `SUBMIT`, `RESUBMIT`, `VIEW_SUBMISSION`
 
-**How it works**
-- A small `PanelPermissions` class decides the allowed actions from the role, the status, and the deadline (easy to unit-test)
-- The panel is a read-side view combining user, assignment and submission data
-- Hiding a button is not security; the action endpoints check permissions themselves
-- A student changing `{studentId}` in the URL must get 404; this needs a test
-- Giving an assignment to a student needs a plain list of the teacher's assignments (title only) to pick from; the full assignment library comes later
-
 ## 8. Package structure (by feature)
 
 ```
 com.yourname.homeworkhub
 ├── HomeworkHubApplication
-├── user/          User, Role, StudentProfile, LessonSlot, repos,
-│                  UserService, StudentController, dto/
-├── assignment/    Assignment, AssignedWork, repos, service, controller, dto/
-├── submission/    Submission, SubmissionFile, FileType, SubmissionStatus, Grade,
+├── user/          User, Role, StudentProfile, repos, UserService,
+│                  StudentController, dto/
+├── assignment/    Assignment, AssignmentWork, repos, service, controller, dto/
+├── submission/    Submission, SubmissionFile, FileType, SubmissionStatus (derived), Grade,
 │                  UploadPolicy, repo, service, controller,
 │                  SubmissionMapper (package-private), dto/ (incl. grade DTOs)
 ├── panel/         PanelService, PanelController, PanelPermissions, Action enum, dto/
@@ -167,32 +208,21 @@ com.yourname.homeworkhub
     └── config/    TimeConfig (Clock bean), PageResponse
 ```
 
-### Dependency rules
-```
-panel      -> submission -> assignment -> user
-submission -> storage
-grading    -> submission
-```
-- One direction only, no cycles
-- Talk to other features through their service or interface, never their repository
-- Package-private by default; `public` only when another feature needs it
-- Never return entities from controllers; use record DTOs
-
 ## 9. API draft
 
 | Method | Path | Who | Notes |
 |--------|------|-----|-------|
 | POST | `/api/students` | Teacher | create student account + profile |
-| PUT | `/api/students/{studentId}` | Teacher | edit profile and lesson times |
-| GET | `/api/students` | Teacher | paginated list with age, lessons, summary |
+| PUT | `/api/students/{studentId}` | Teacher | edit name, school class |
+| GET | `/api/students` | Teacher | paginated list with lessons held, next lesson, summary |
 | GET | `/api/students/{studentId}/panel` | Teacher | paginated, `?status=` |
 | GET | `/api/me/panel` | Student | paginated, own assigned work |
 | POST | `/api/assignments` | Teacher | multipart: data + PDF |
 | GET | `/api/assignments` | Teacher | simple list (id, title) for the picker |
 | GET | `/api/assignments/{id}/file` | Assigned student / Teacher | PDF download |
-| POST | `/api/assignments/{id}/assign` | Teacher | body: student ids |
-| PUT | `/api/assigned-work/{id}/deadline` | Teacher | extension for one student |
-| POST | `/api/assigned-work/{id}/submissions` | Student | multipart: `files` (list) |
+| POST | `/api/assignments/{id}/assign` | Teacher | body: student ids + deadline |
+| PUT | `/api/assignment-work/{id}/deadline` | Teacher | extension for one student |
+| POST | `/api/assignment-work/{id}/submissions` | Student | multipart: `files` (list) |
 | GET | `/api/submissions/{id}` | Owner / Teacher | |
 | GET | `/api/submissions/{id}/files/{fileId}` | Owner / Teacher | one file (PDF or image) |
 | PUT | `/api/submissions/{id}/grade` | Teacher | body: value, feedback |
@@ -202,25 +232,22 @@ grading    -> submission
 
 ### Step 1: Plain Java domain (no Spring, no JPA)
 - [ ] Create project at start.spring.io (Web, Validation, JPA, H2), first commit
-- [ ] `Assignment` + tests
-- [ ] `AssignedWork` + tests (deadline override, `isOpenAt`)
-- [ ] `LessonSlot` value object + tests (positive duration, overlap check)
-- [ ] `StudentProfile` + tests (age from date of birth and a given date, no future birth date)
+- [ ] `AssignmentWork` + tests (deadline required, `isOpenAt`, extension)
+- [ ] `Assignment` + tests (title, no deadline)
 - [ ] `FileType` enum (PDF, JPEG, PNG) and `SubmissionFile` value object
-- [ ] `SubmissionStatus` enum
-- [ ] `Submission` + tests, static factory
-- [ ] File-set rules + tests: one PDF, or 1 to 10 images, no mixing
 - [ ] `Grade` record + tests
+- [ ] `Submission` + tests (on time, late, resubmit, graded is locked), static factory, derived status
+- [ ] File-set rules + tests: one PDF, or 1 to 10 images, no mixing
 - [ ] `HomeworkHubException`, `DeadlinePassedException`
 
 ### Step 2: Spring Boot + REST, in-memory storage
-- [ ] Controllers and DTO records for students, assignments and submissions
+- [ ] Controllers and DTO records for students, lessons, assignments and submissions
 - [ ] Services with constructor injection
 - [ ] `Clock` bean
 - [ ] Create student, give assignment to students
 
 ### Step 3: JPA + H2
-- [ ] Add JPA annotations to entities (`LessonSlot` as embeddable collection)
+- [ ] Add JPA annotations to entities (`Grade` as `@Embedded`)
 - [ ] Repositories
 - [ ] `@DataJpaTest` tests
 - [ ] Pagination: student list, student panel, history (Slice)
@@ -254,6 +281,7 @@ grading    -> submission
 - [ ] `@Transactional` on submit
 - [ ] Failure scenario: files saved, DB fails
 - [ ] Self-invocation demo
+- [ ] `@Version` for optimistic locking (student resubmits while teacher grades)
 
 ### Step 8: Security
 - [ ] Session login, BCrypt, roles
@@ -271,3 +299,4 @@ grading    -> submission
 - [ ] ArchUnit
 
 ## 11. DB scheme
+![img_1.png](img_1.png)
