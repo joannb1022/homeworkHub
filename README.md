@@ -189,7 +189,7 @@ com.yourname.homeworkhub
 ├── HomeworkHubApplication
 ├── user/          User, Role, StudentProfile, repos, UserService,
 │                  StudentController, dto/
-├── assignment/    Assignment, AssignmentWork, repos, service, controller, dto/
+├── assignment/    Assignment, AssignedWork, repos, service, controller, dto/
 ├── submission/    Submission, SubmissionFile, FileType, SubmissionStatus (derived), Grade,
 │                  UploadPolicy, repo, service, controller,
 │                  SubmissionMapper (package-private), dto/ (incl. grade DTOs)
@@ -228,7 +228,7 @@ com.yourname.homeworkhub
 
 ### Step 1: Plain Java domain (no Spring, no JPA)
 - [ ] Create project at start.spring.io (Web, Validation, JPA, H2), first commit
-- [ ] `AssignmentWork` + tests (deadline required, `isOpenAt`, extension)
+- [ ] `AssignedWork` + tests (deadline required, `isOpenAt`, extension)
 - [ ] `Assignment` + tests (title, no deadline)
 - [ ] `FileType` enum (PDF, JPEG, PNG) and `SubmissionFile` value object
 - [ ] `Grade` record + tests

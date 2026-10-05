@@ -1,4 +1,6 @@
-package org.example.homeworkhub.common;
+package org.example.homeworkhub.common.error;
 
-public class HomeworkHubException {
+public abstract class HomeworkHubException extends RuntimeException {
+    protected HomeworkHubException(String message) { super(message); }
 }
+

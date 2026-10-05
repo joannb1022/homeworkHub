@@ -1,4 +1,4 @@
-package org.example.homeworkhub.assignment;
+package org.example.homeworkhub.assignment.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
