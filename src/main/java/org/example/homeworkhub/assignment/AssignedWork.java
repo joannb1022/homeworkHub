@@ -9,29 +9,40 @@ import java.time.Instant;
 public class AssignedWork {
 
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assignment_id")
+    @JoinColumn(name = "assignment_id", nullable = false)
     private Assignment assignment;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id")
+    @JoinColumn(name = "student_id", nullable = false)
     private StudentProfile studentProfile;
 
     @Column(nullable = false)
     private Instant deadline;
 
-    @Column(name= "assigned_at", nullable = false)
+    @Column(name = "assigned_at", nullable = false, updatable = false)
     private Instant assignedAt;
+
+    protected AssignedWork() {
+    }
+
+    public AssignedWork(Assignment assignment, StudentProfile studentProfile, Instant deadline) {
+        this.assignment = assignment;
+        this.studentProfile = studentProfile;
+        this.deadline = deadline;
+    }
 
     @PrePersist
     protected void onCreate() {
-        this.assignedAt = Instant.now();
+        if (this.assignedAt == null) {
+            this.assignedAt = Instant.now();
+        }
     }
 
-    public boolean isBeforeDeadline(Instant now){
+    public boolean isBeforeDeadline(Instant now) {
         return now.isBefore(deadline);
     }
 }
