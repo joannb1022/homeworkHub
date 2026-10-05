@@ -14,14 +14,13 @@ A small app where a teacher keeps a list of their students, gives homework (PDF)
 - "Promote everyone to the next school class" button
 - AI grading via the `SubmissionChecker` interface
 - Cloud storage via the `FileStorage` interface
-- Plan and list lesson dates, notifications, frontend, multiple teachers
 
 ## 3. Actors
 
-| Actor | Can do                                                                                                                                                                               |
-|-------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Actor | Can do |
+|-------|--------|
 | TEACHER | Add and edit students, see the student list, open any student's panel, create assignments, give them to students, see submissions, grade, give feedback, extend a student's deadline |
-| STUDENT | Open own panel, download assignment PDFs, upload and resubmit own solutions, see own grades and feedback                                                                             |
+| STUDENT | Open own panel, download assignment PDFs, upload and resubmit own solutions, see own grades and feedback |
 
 ## 4. Features
 
@@ -30,7 +29,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done
 - [ ] Log in (session-based first, JWT later)
 - [ ] Teacher adds a student (creates the account and profile)
 - [ ] Teacher edits a student's profile (name, school class)
-- [ ] Teacher sees the student list: name, school class
+- [ ] Teacher sees the student list: name, school class, short summary (paginated)
 - [ ] Teacher clicks a student to open that student's panel
 - [ ] Teacher creates an assignment (title, description, PDF)
 - [ ] Teacher gives an assignment to one or more students with a deadline (from the student's panel, or by picking students)
@@ -52,7 +51,6 @@ Each rule should have at least one test.
 - First name and last name must not be blank (both roles have them)
 - School class is optional text (for example `7A`); the teacher updates it by hand
 - Personal data is minimal and visible only to the teacher and the student themselves
-- A student sees only the teacher's name, never the teacher's email or any other student's data
 
 ### Assignment
 - Title must not be blank
@@ -90,7 +88,7 @@ Each rule should have at least one test.
 - Only a teacher can grade
 
 ### Authorization
-- A student can only open their own panel and profile and read their own submissions
+- A student can only open their own panel, profile and read their own submissions
 - A teacher can open any student's profile and panel and read all submissions
 - Access to another student's data returns 404 (not 403)
 - A student sees only the teacher's name, never the teacher's email or any other student's data
@@ -166,23 +164,21 @@ submission_file
 | assignment_work - submission | An assignment work has zero or one submission; a submission belongs to exactly one assignment work |
 | submission - submission_file | A submission has 1 to 10 files; each file belongs to exactly one submission |
 
-
 ## 7. Panel view
 
 Same view, different capabilities.
 
 **Teacher: student list** (`/api/students`)
 - Paginated list: first name, last name, school class
-- Per student: short summary (open assignments, waiting to be graded, overdue)
 - Click a student to open their panel
 
 **Teacher: a student's panel** (`/api/students/{studentId}/panel`)
-- Header: the teacher's own name, then the student's profile (name, school class)
+- Header: the teacher's own name, then the student's profile (name, school class),
 - The student's assigned work with status, deadline and grade; paginated, with a status filter
 - Teacher actions: give a new assignment, `VIEW_SUBMISSION`, `DOWNLOAD_SUBMISSION`, `GRADE`, `EXTEND_DEADLINE`
 
 **Student: own panel** (`/api/me/panel`)
-- Header: the student's own name and the teacher's name (first and last name only)
+- Header: the student's own name, the teacher's name (first and last name only),
 - Own assigned work with status, deadline and grade; each item shows who gave it ("Given by ...")
 - Actions: `DOWNLOAD_ASSIGNMENT`, `SUBMIT`, `RESUBMIT`, `VIEW_SUBMISSION`
 
@@ -210,23 +206,23 @@ com.yourname.homeworkhub
 
 ## 9. API draft
 
-| Method | Path | Who | Notes |
-|--------|------|-----|-------|
-| POST | `/api/students` | Teacher | create student account + profile |
-| PUT | `/api/students/{studentId}` | Teacher | edit name, school class |
-| GET | `/api/students` | Teacher | paginated list with lessons held, next lesson, summary |
-| GET | `/api/students/{studentId}/panel` | Teacher | paginated, `?status=` |
-| GET | `/api/me/panel` | Student | paginated, own assigned work |
-| POST | `/api/assignments` | Teacher | multipart: data + PDF |
+| Method | Path | Who | Notes                                  |
+|--------|------|-----|----------------------------------------|
+| POST | `/api/students` | Teacher | create student account + profile       |
+| PUT | `/api/students/{studentId}` | Teacher | edit name, school class                |
+| GET | `/api/students` | Teacher | paginated list with summary            |
+| GET | `/api/students/{studentId}/panel` | Teacher | paginated, `?status=`                  |
+| GET | `/api/me/panel` | Student | paginated, own assigned work           |
+| POST | `/api/assignments` | Teacher | multipart: data + PDF                  |
 | GET | `/api/assignments` | Teacher | simple list (id, title) for the picker |
-| GET | `/api/assignments/{id}/file` | Assigned student / Teacher | PDF download |
-| POST | `/api/assignments/{id}/assign` | Teacher | body: student ids + deadline |
-| PUT | `/api/assignment-work/{id}/deadline` | Teacher | extension for one student |
-| POST | `/api/assignment-work/{id}/submissions` | Student | multipart: `files` (list) |
-| GET | `/api/submissions/{id}` | Owner / Teacher | |
-| GET | `/api/submissions/{id}/files/{fileId}` | Owner / Teacher | one file (PDF or image) |
-| PUT | `/api/submissions/{id}/grade` | Teacher | body: value, feedback |
-| GET | `/api/me/submissions` | Student | Slice, history |
+| GET | `/api/assignments/{id}/file` | Assigned student / Teacher | PDF download                           |
+| POST | `/api/assignments/{id}/assign` | Teacher | body: student ids + deadline           |
+| PUT | `/api/assignment-work/{id}/deadline` | Teacher | extension for one student              |
+| POST | `/api/assignment-work/{id}/submissions` | Student | multipart: `files` (list)              |
+| GET | `/api/submissions/{id}` | Owner / Teacher |                                        |
+| GET | `/api/submissions/{id}/files/{fileId}` | Owner / Teacher | one file (PDF or image)                |
+| PUT | `/api/submissions/{id}/grade` | Teacher | body: value, feedback                  |
+| GET | `/api/me/submissions` | Student | Slice, history                         |
 
 ## 10. Task board
 
@@ -241,14 +237,14 @@ com.yourname.homeworkhub
 - [ ] `HomeworkHubException`, `DeadlinePassedException`
 
 ### Step 2: Spring Boot + REST, in-memory storage
-- [ ] Controllers and DTO records for students, lessons, assignments and submissions
+- [ ] Controllers and DTO records for students, assignments and submissions
 - [ ] Services with constructor injection
 - [ ] `Clock` bean
 - [ ] Create student, give assignment to students
 
 ### Step 3: JPA + H2
+- [ ] Write the schema as a Flyway migration (`V1__init.sql`) or let Hibernate generate it first and compare
 - [ ] Add JPA annotations to entities (`Grade` as `@Embedded`)
-- [ ] Repositories
 - [ ] `@DataJpaTest` tests
 - [ ] Pagination: student list, student panel, history (Slice)
 - [ ] N+1 experiment (student list with summary is a good candidate)
@@ -269,7 +265,7 @@ com.yourname.homeworkhub
 - [ ] `ImageSanitizer`: orientation, strip EXIF, pixel size check
 - [ ] Multipart limits in `application.properties` (max-file-size 20MB, max-request-size 50MB)
 - [ ] `@TempDir` tests, filename and path traversal protection
-- [ ] Cleanup of already-saved files if a later file fails
+- [ ] Cleanup: save new files first, delete old ones last; remove saved files if a later one fails
 
 ### Step 6: Validation and error handling
 - [ ] `GlobalExceptionHandler` with ProblemDetail
@@ -291,12 +287,9 @@ com.yourname.homeworkhub
 
 ### Step 9: Extras
 - [ ] Assignment library for the teacher
-- [ ] Filter the student list by lesson day ("who do I teach today?")
+- [ ] "Promote everyone to the next school class"
 - [ ] PostgreSQL + Docker
 - [ ] JWT
 - [ ] `SubmissionChecker` AI implementation (suggest only, teacher approves)
 - [ ] ZIP download of a submission for the teacher
 - [ ] ArchUnit
-
-## 11. DB scheme
-![img_1.png](img_1.png)
