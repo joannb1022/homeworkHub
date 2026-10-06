@@ -1,7 +1,6 @@
 package org.example.homeworkhub.assignment;
 
 import jakarta.persistence.*;
-import org.example.homeworkhub.user.User;
 
 import java.time.Instant;
 
@@ -9,7 +8,7 @@ import java.time.Instant;
 public class Assignment {
 
     @Id
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
     @Column(nullable = false)
@@ -24,9 +23,43 @@ public class Assignment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_user_id", nullable = false) //TODO how to name it better
-    private User owner;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "owner_user_id", nullable = false) //TODO how to name it better
+//    private User owner;
+
+    public Assignment(String title, String description, Long pdfFileKey) {
+        this.title = title;
+        this.description = description;
+        this.pdfFileKey = pdfFileKey;
+//        this.owner = owner;
+    }
+
+    public Assignment() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public Long getPdfFileKey() {
+        return pdfFileKey;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+//    public User getOwner() {
+//        return owner;
+//    }
 
     @PrePersist
     protected void onCreate() {
